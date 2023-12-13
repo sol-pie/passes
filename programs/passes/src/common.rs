@@ -21,12 +21,24 @@ pub fn calc_price(supply: u64, amount: u64) -> u64 {
     let summation = sum2 - sum1;
     let price = (summation * ONE_USDC) / 160;
 
-    msg!(
-        "Calc: price {}, amount {}, supply {}",
-        price,
-        amount,
-        supply
-    );
+    if cfg!(feature = "local-testing") {
+        msg!(
+            "Calc: sum1 {}, sum2 {}, summation {}, price {}, amount {}, supply {}",
+            sum1,
+            sum2,
+            summation,
+            price,
+            amount,
+            supply
+        );
+    } else {
+        msg!(
+            "Calc: price {}, amount {}, supply {}",
+            price,
+            amount,
+            supply
+        );
+    }
     price
 }
 
@@ -46,13 +58,45 @@ pub fn calc_price_sol(supply: u64, amount: u64) -> u64 {
     let summation = sum2 - sum1;
     let price = (summation * ONE_SOL) / 1600;
 
-    msg!(
-        "Calc: price {}, amount {}, supply {}",
-        price,
-        amount,
-        supply
-    );
+    if cfg!(feature = "local-testing") {
+        msg!(
+            "Calc: sum1 {}, sum2 {}, summation {}, price {}, amount {}, supply {}",
+            sum1,
+            sum2,
+            summation,
+            price,
+            amount,
+            supply
+        );
+    } else {
+        msg!(
+            "Calc: price {}, amount {}, supply {}",
+            price,
+            amount,
+            supply
+        );
+    }
     price
+}
+
+pub fn calc_fees(
+    price: u64,
+    protocol_fee_pct: u64,
+    owner_fee_pct: u64,
+    divider: u64,
+) -> Result<(u64, u64)> {
+    let protocol_fees = price
+        .checked_mul(protocol_fee_pct)
+        .ok_or(PassesError::MathOverflow)?
+        .checked_div(divider)
+        .ok_or(PassesError::MathOverflow)?;
+    let owner_fees = price
+        .checked_mul(owner_fee_pct)
+        .ok_or(PassesError::MathOverflow)?
+        .checked_div(divider)
+        .ok_or(PassesError::MathOverflow)?;
+
+    Ok((protocol_fees, owner_fees))
 }
 
 pub fn scale(amount: u64, decimals: u8) -> u64 {
@@ -77,7 +121,6 @@ pub fn transfer_tokens<'info>(
     amount: u64,
     authority_seeds: &[&[&[u8]]],
 ) -> Result<()> {
-    // let authority_seeds: &[&[&[u8]]] = &[&[b"transfer_authority"]];
     let ctx = CpiContext::new_with_signer(
         token_program,
         Transfer {
@@ -87,9 +130,6 @@ pub fn transfer_tokens<'info>(
         },
         authority_seeds,
     );
-    // .with_signer(authority_seeds);
-
-    msg!("authority_seeds: {:#?}", authority_seeds);
 
     anchor_spl::token::transfer(ctx, amount)
 }

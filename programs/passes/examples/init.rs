@@ -24,10 +24,12 @@ fn main() {
     let admin = read_keypair_file(KEY_PATH).expect("Failed to read keypair from JSON");
     let mint = create_token(&rpc_client, &admin);
 
-    let (state, _) = Pubkey::find_program_address(&[b"state".as_slice()], &program_id);
-    let (escrow_wallet, _) =
+    let (config, _) = Pubkey::find_program_address(&[b"config".as_slice()], &program_id);
+    let (escrow_token_wallet, _) =
         Pubkey::find_program_address(&[b"escrow".as_slice(), mint.pubkey().as_ref()], &program_id);
-    let fee_token =
+    let (escrow_sol_wallet, _) = Pubkey::find_program_address(&[b"escrow".as_slice()], &program_id);
+
+    let protocol_fee_wallet =
         anchor_spl::associated_token::get_associated_token_address(&admin.pubkey(), &mint.pubkey());
 
     let args = instruction::Init {
@@ -36,9 +38,10 @@ fn main() {
     };
     let accounts = accounts::Init {
         admin: admin.pubkey(),
-        state,
-        escrow_wallet,
-        protocol_fee_token: fee_token,
+        config,
+        escrow_token_wallet,
+        escrow_sol_wallet,
+        protocol_fee_wallet,
         payment_mint: mint.pubkey(),
         system_program: system_program::ID,
         token_program: anchor_spl::token::ID,

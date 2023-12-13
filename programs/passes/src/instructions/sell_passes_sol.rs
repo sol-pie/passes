@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use solana_program::system_instruction;
 
 use crate::{
     common::{calc_fees, calc_price_sol},
@@ -7,13 +6,13 @@ use crate::{
     state, ONE_SOL,
 };
 
-// Purchase passes from a specified passes owner by sending a certain amount of token as payment
+// Enables passes holders to sell their passes back to the contract
 
 #[derive(Accounts)]
-pub struct BuyPassesSol<'info> {
+pub struct SellPassesSol<'info> {
     // signer
     #[account(mut)]
-    pub buyer: Signer<'info>,
+    pub seller: Signer<'info>,
 
     // derived PDAs
     #[account{
@@ -23,12 +22,9 @@ pub struct BuyPassesSol<'info> {
     }]
     passes_supply: Box<Account<'info, state::PassesSupply>>,
 
-    // TODO it is security init_if_needed?
     #[account{
-        init_if_needed,
-        payer = buyer,
-        space = state::PassesBalance::LEN,
-        seeds = [b"balance", passes_owner.key.as_ref(), buyer.key.as_ref()],
+        mut,
+        seeds = [b"balance", passes_owner.key.as_ref(), seller.key.as_ref()],
         bump,
     }]
     passes_balance: Box<Account<'info, state::PassesBalance>>,
@@ -62,20 +58,21 @@ pub struct BuyPassesSol<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// Buy passes with SOL
+// Sell passes
 
-pub fn buy_passes_sol(ctx: Context<BuyPassesSol>, amount: u64) -> Result<()> {
+pub fn sell_passes_sol(ctx: Context<SellPassesSol>, amount: u64) -> Result<()> {
     let supply = ctx.accounts.passes_supply.amount;
+    let balance = ctx.accounts.passes_balance.amount;
     let owner = ctx.accounts.passes_owner.key();
-    let buyer = ctx.accounts.buyer.key();
+    let seller = ctx.accounts.seller.key();
     let config = &ctx.accounts.config;
     let passes_balance = &mut ctx.accounts.passes_balance;
     let passes_supply = &mut ctx.accounts.passes_supply;
 
-    require!(supply > 0, PassesError::ZeroSupply);
+    require!(supply > amount, PassesError::LastPass);
+    require!(balance >= amount, PassesError::InsufficientPasses);
 
-    let price = calc_price_sol(supply, amount);
-    require!(price > 0, PassesError::ZeroPrice);
+    let price = calc_price_sol(supply - amount, amount);
 
     let (protocol_fees, owner_fees) = calc_fees(
         price,
@@ -83,61 +80,55 @@ pub fn buy_passes_sol(ctx: Context<BuyPassesSol>, amount: u64) -> Result<()> {
         config.owner_fee_pct,
         ONE_SOL,
     )?;
+    require!(price > 0, PassesError::ZeroPrice);
 
-    // send buyer's token to escrow wallet
-    let from = ctx.accounts.buyer.to_account_info();
-    let to = ctx.accounts.escrow_wallet.to_account_info();
-    anchor_lang::solana_program::program::invoke(
-        &system_instruction::transfer(from.key, to.key, price),
-        &[
-            from.clone(),
-            to,
-            ctx.accounts.system_program.to_account_info(),
-        ],
-    )?;
-    msg!("Send buyer payment to escrow wallet: {}", price);
+    // msg!("config {:#?}", ctx.accounts.config.to_account_info());
+    // msg!("escrow {:#?}", ctx.accounts.escrow_wallet.to_account_info());
+    // msg!("passes_supply {:#?}", passes_supply.to_account_info());
+    // msg!(
+    //     "passes_owner {:#?}",
+    //     ctx.accounts.passes_owner.to_account_info()
+    // );
+
+    // send SOL to seller for sold passes
+    let sent_amount = price
+        .checked_sub(protocol_fees)
+        .ok_or(PassesError::MathOverflow)?
+        .checked_sub(owner_fees)
+        .ok_or(PassesError::MathOverflow)?;
+    ctx.accounts.escrow_wallet.sub_lamports(sent_amount)?;
+    ctx.accounts.seller.add_lamports(sent_amount)?;
 
     // send protocol fees
-    let to = ctx.accounts.protocol_fee_wallet.to_account_info();
-    anchor_lang::solana_program::program::invoke(
-        &system_instruction::transfer(from.key, to.key, protocol_fees),
-        &[
-            from.clone(),
-            to,
-            ctx.accounts.system_program.to_account_info(),
-        ],
-    )?;
-    msg!("Send protocol fees: {}", protocol_fees);
+    ctx.accounts.escrow_wallet.sub_lamports(protocol_fees)?;
+    ctx.accounts
+        .protocol_fee_wallet
+        .add_lamports(protocol_fees)?;
 
     // send owner fees
-    let to = ctx.accounts.passes_owner.clone();
-    let cpi_context = CpiContext::new(
-        ctx.accounts.system_program.to_account_info(),
-        anchor_lang::system_program::Transfer { from, to },
-    );
-    anchor_lang::system_program::transfer(cpi_context, owner_fees)?;
-    msg!("Send owner fees: {}", owner_fees);
+    ctx.accounts.escrow_wallet.sub_lamports(owner_fees)?;
+    ctx.accounts.passes_owner.add_lamports(owner_fees)?;
 
     passes_balance.amount = passes_balance
         .amount
-        .checked_add(amount)
+        .checked_sub(amount)
         .ok_or(PassesError::MathOverflow)?;
     passes_supply.amount = passes_supply
         .amount
-        .checked_add(amount)
+        .checked_sub(amount)
         .ok_or(PassesError::MathOverflow)?;
 
     msg!(
-        "Buy passes: owner {}, buyer {}, amount {}, price {}, protocol_fees {}, owner_fees {}, balance {}, supply {}",
+        "Sell passes: owner {}, seller {}, amount {}, price {}, protocol_fees {}, owner_fees {}, balance {}, supply {}",
         owner,
-        buyer,
+        seller,
         amount,
         price,
         protocol_fees,
         owner_fees,
         passes_balance.amount,
         passes_supply.amount
-    );
+        );
 
     Ok(())
 }

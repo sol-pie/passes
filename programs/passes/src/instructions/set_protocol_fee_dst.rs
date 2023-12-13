@@ -14,31 +14,30 @@ pub struct SetProtocolFeeDst<'info> {
     // derived PDAs
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [state::Config::SEED],
         bump,
-        realloc = state::Passes::LEN,
-        realloc::payer = admin,
-        realloc::zero = true,
-        has_one = admin
+        // realloc = state::Config::LEN,
+        // realloc::payer = admin,
+        // realloc::zero = true,
+        constraint = admin.key() == config.admin
     )]
-    pub state: Account<'info, state::Passes>,
+    pub config: Account<'info, state::Config>,
+
     #[account(
-        associated_token::mint = state.payment_mint,
+        associated_token::mint = config.payment_mint,
         associated_token::authority = admin
     )]
-    protocol_fee_token: Account<'info, TokenAccount>, // token account to send fee
+    protocol_fee_wallet: Account<'info, TokenAccount>, // token account to send fee
 
     // programs
     pub system_program: Program<'info, System>,
-    // pub token_program: Program<'info, Token>,
-    // pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub fn set_protocol_fee_dst(ctx: Context<SetProtocolFeeDst>) -> Result<()> {
-    ctx.accounts.state.protocol_fee_token = ctx.accounts.protocol_fee_token.key();
+    ctx.accounts.config.protocol_fee_token_wallet = ctx.accounts.protocol_fee_wallet.key();
     msg!(
         "Protocol fee token: {}",
-        ctx.accounts.state.protocol_fee_token
+        ctx.accounts.config.protocol_fee_token_wallet
     );
 
     Ok(())

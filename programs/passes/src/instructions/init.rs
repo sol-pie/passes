@@ -18,27 +18,43 @@ pub struct Init<'info> {
     #[account(
         init,
         payer = admin,
-        space = state::Passes::LEN,
-        seeds = [b"state"],
+        space = state::Config::LEN,
+        seeds = [state::Config::SEED],
         bump
     )]
-    pub state: Account<'info, state::Passes>,
+    pub config: Account<'info, state::Config>,
+
     #[account(
         init,
         payer = admin,
         seeds = [b"escrow", payment_mint.key().as_ref()],
         bump,
         token::mint = payment_mint,
-        token::authority = state
+        token::authority = config
     )]
-    pub escrow_wallet: Account<'info, TokenAccount>, // escrow wallet (associated token account) to store buyer payments
+    pub escrow_token_wallet: Account<'info, TokenAccount>, // escrow wallet (associated token account) to store buyer payments
+
+    #[account(
+        init,
+        payer = admin,
+        space = state::EscrowSOL::LEN,
+        seeds = [state::EscrowSOL::SEED],
+        bump
+    )]
+    pub escrow_sol_wallet: Account<'info, state::EscrowSOL>, // escrow wallet for SOL payment
+
     #[account(
         init_if_needed,
         payer = admin,
         associated_token::mint = payment_mint,
         associated_token::authority = admin
     )]
-    pub protocol_fee_token: Account<'info, TokenAccount>, // protocol's ATA to get fees
+    pub protocol_fee_wallet: Account<'info, TokenAccount>, // protocol's ATA to get fees
+
+    // #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    // pub program: Program<'info, Passes>,
+    // #[account(constraint = program_data.upgrade_authority_address == Some(admin.key()))]
+    // pub program_data: Account<'info, ProgramData>,
 
     // accounts
     pub payment_mint: Account<'info, Mint>, // e.g. USDC mint account
@@ -50,24 +66,27 @@ pub struct Init<'info> {
 }
 
 pub fn init(ctx: Context<Init>, protocol_fee_pct: u64, owner_fee_pct: u64) -> Result<()> {
-    let state = &mut ctx.accounts.state;
+    let config = &mut ctx.accounts.config;
 
-    state.admin = *ctx.accounts.admin.key;
-    state.payment_mint = ctx.accounts.payment_mint.key();
-    state.escrow_wallet = ctx.accounts.escrow_wallet.key();
-    state.protocol_fee_token = ctx.accounts.protocol_fee_token.key();
-    state.protocol_fee_pct = protocol_fee_pct;
-    state.owner_fee_pct = owner_fee_pct;
+    config.admin = *ctx.accounts.admin.key;
+    config.payment_mint = ctx.accounts.payment_mint.key();
+    config.escrow_token_wallet = ctx.accounts.escrow_token_wallet.key();
+    config.escrow_sol_wallet = ctx.accounts.escrow_sol_wallet.key();
+    config.protocol_fee_token_wallet = ctx.accounts.protocol_fee_wallet.key();
+    config.protocol_fee_pct = protocol_fee_pct;
+    config.owner_fee_pct = owner_fee_pct;
 
     msg!(
-        "Init: program admin {}, payment mint {}, escrow wallet {}, protocol fee token {}, protocol fee pct {}, owner fee {}",
-        state.admin,
-        state.payment_mint,
-        state.escrow_wallet,
-        state.protocol_fee_token,
-        state.protocol_fee_pct,
-        state.owner_fee_pct
-    );
+            "Init: program admin {}, config {}, payment mint {}, escrow token wallet {}, escrow sol wallet {}, protocol fee token wallet {}, protocol fee pct {}, owner fee pct{}",
+            config.admin,
+            config.key(),
+            config.payment_mint,
+            config.escrow_token_wallet,
+            config.escrow_sol_wallet,
+            config.protocol_fee_token_wallet,
+            config.protocol_fee_pct,
+            config.owner_fee_pct
+        );
 
     Ok(())
 }

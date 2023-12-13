@@ -12,4 +12,10 @@ pub enum PassesError {
     InsufficientPasses,
     #[msg("Overflow in arithmetic operation")]
     MathOverflow,
+    #[msg("The passes are already issued")]
+    PassesAlreadyIssued,
+    #[msg("Amount cannot be zero")]
+    ZeroAmount,
+    #[msg("Price cannot be zero")]
+    ZeroPrice,
 }

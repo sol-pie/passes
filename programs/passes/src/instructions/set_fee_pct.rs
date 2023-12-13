@@ -7,33 +7,36 @@ use crate::state;
 #[derive(Accounts)]
 pub struct SetFeePercent<'info> {
     // signer
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = admin.key() == config.admin
+    )]
     pub admin: Signer<'info>,
 
     // derived PDAs
     #[account(
         mut,
-        seeds = [b"state"],
+        seeds = [state::Config::SEED],
         bump,
-        realloc = state::Passes::LEN,
-        realloc::payer = admin,
-        realloc::zero = true,
+        // realloc = state::Config::LEN,
+        // realloc::payer = admin,
+        // realloc::zero = true,
         has_one = admin
     )]
-    pub state: Account<'info, state::Passes>,
+    pub config: Account<'info, state::Config>,
 
     // programs
     pub system_program: Program<'info, System>,
 }
 
 pub fn set_protocol_fee_pct(ctx: Context<SetFeePercent>, fee_pct: u64) -> Result<()> {
-    ctx.accounts.state.protocol_fee_pct = fee_pct;
+    ctx.accounts.config.protocol_fee_pct = fee_pct;
 
     Ok(())
 }
 
 pub fn set_owner_fee_pct(ctx: Context<SetFeePercent>, fee_pct: u64) -> Result<()> {
-    ctx.accounts.state.owner_fee_pct = fee_pct;
+    ctx.accounts.config.owner_fee_pct = fee_pct;
 
     Ok(())
 }
