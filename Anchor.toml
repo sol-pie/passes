@@ -7,11 +7,14 @@ skip-lint = false
 [programs.devnet]
 passes = "8j5vzygvZzkmFAQ186yPbr4vgVGFtSvmFyzE7KVXmB8Q"
 
+[programs.localnet]
+passes = "8j5vzygvZzkmFAQ186yPbr4vgVGFtSvmFyzE7KVXmB8Q"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "../dev3-keypair.json"
 
 [scripts]
