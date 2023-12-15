@@ -14,12 +14,14 @@ pub struct Config {
     pub escrow_token_wallet: Pubkey,
     /// The escrow wallet to store buyer payments in SOL
     pub escrow_sol_wallet: Pubkey,
-    /// The percentage of protocol fees
-    pub protocol_fee_pct: u64,
+    /// The protocol fees in bps
+    pub protocol_fee_bps: u64,
     /// The percentage of owner fees
-    pub owner_fee_pct: u64,
-    // The destination address (associated token account) for receiving protocol fees
+    pub owner_fee_bps: u64,
+    /// The destination address (associated token account) for receiving protocol fees
     pub protocol_fee_token_wallet: Pubkey,
+
+    pub bump: u8,
 }
 
 impl Config {
@@ -32,6 +34,8 @@ impl Config {
 pub struct PassesSupply {
     // The supply associated with the  passes owner
     pub amount: u64,
+
+    pub bump: u8,
 }
 
 impl PassesSupply {
@@ -44,6 +48,8 @@ impl PassesSupply {
 pub struct PassesBalance {
     // The passes balances for respective holder and owner
     pub amount: u64,
+
+    pub bump: u8,
 }
 
 impl PassesBalance {
@@ -52,7 +58,9 @@ impl PassesBalance {
 }
 
 #[account]
-pub struct EscrowSOL {}
+pub struct EscrowSOL {
+    pub bump: u8,
+}
 
 impl EscrowSOL {
     pub const LEN: usize = DISCRIMINATOR_LENGTH + std::mem::size_of::<EscrowSOL>();

@@ -30,10 +30,12 @@ use crate::{
 use utils::*;
 
 // TODO bps?
-const PROTOCOL_FEE_USDC: u64 = 10_000; // 1% = 0.01*10^6
-const OWNER_FEE_USDC: u64 = 10_000; // 1% = 0.01*10^6
-const PROTOCOL_FEE_SOL: u64 = 10_000_000; // 1% = 0.01*10^9
-const OWNER_FEE_SOL: u64 = 10_000_000; // 1% = 0.01*10^9
+// const PROTOCOL_FEE_USDC: u64 = 10_000; // 1% = 0.01*10^6
+// const OWNER_FEE_USDC: u8 = 10_000; // 1% = 0.01*10^6
+// const PROTOCOL_FEE_SOL: u8 = 10_000_000; // 1% = 0.01*10^9
+// const OWNER_FEE_SOL: u64 = 10_000_000; // 1% = 0.01*10^9
+const PROTOCOL_FEE_BPS: u64 = 100; // 100bps = 1%
+const OWNER_FEE_BPS: u64 = 100; // 100bps = 1%
 const TICKER: &str = "usdc";
 
 #[derive(Debug)]
@@ -50,8 +52,8 @@ async fn test_init() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_USDC,
-        OWNER_FEE_USDC,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -68,8 +70,8 @@ async fn test_init() {
     assert_eq!(config.payment_mint, mint);
     assert_eq!(config.escrow_sol_wallet, escrow_sol_wallet);
     assert_eq!(config.escrow_token_wallet, escrow_token_wallet);
-    assert_eq!(config.owner_fee_pct, OWNER_FEE_USDC);
-    assert_eq!(config.protocol_fee_pct, PROTOCOL_FEE_USDC);
+    assert_eq!(config.owner_fee_bps, OWNER_FEE_BPS);
+    assert_eq!(config.protocol_fee_bps, PROTOCOL_FEE_BPS);
     assert_eq!(config.protocol_fee_token_wallet, protocol_fee_wallet);
 }
 
@@ -123,13 +125,13 @@ async fn test_set_fees_pct() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_USDC,
-        OWNER_FEE_USDC,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
     // set protocol fee percent
-    let args = instruction::SetProtocolFeePct { fee_pct: 11111111 };
+    let args = instruction::SetProtocolFeeBps { fee_bps: 11111111 };
     let accounts = accounts::SetFeePercent {
         admin: initializer.pubkey(),
         config: config_pda,
@@ -145,7 +147,7 @@ async fn test_set_fees_pct() {
     assert_matches!(res, Ok(()));
 
     // set owner fee percent
-    let args = instruction::SetOwnerFeePct { fee_pct: 2222222 };
+    let args = instruction::SetOwnerFeeBps { fee_bps: 2222222 };
     let accounts = accounts::SetFeePercent {
         admin: initializer.pubkey(),
         config: config_pda,
@@ -162,8 +164,8 @@ async fn test_set_fees_pct() {
 
     // check protocol fee percent
     let config: Config = get_account(&mut ctx, config_pda).await;
-    assert_eq!(config.protocol_fee_pct, 11111111);
-    assert_eq!(config.owner_fee_pct, 2222222);
+    assert_eq!(config.protocol_fee_bps, 11111111);
+    assert_eq!(config.owner_fee_bps, 2222222);
 }
 
 #[tokio::test]
@@ -177,8 +179,8 @@ async fn test_set_fee_dst() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_USDC,
-        OWNER_FEE_USDC,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -216,8 +218,8 @@ async fn test_issue_passes() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_USDC,
-        OWNER_FEE_USDC,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -240,8 +242,8 @@ async fn test_buy_passes_w_usdc() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_USDC,
-        OWNER_FEE_USDC,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -278,13 +280,13 @@ async fn test_buy_passes_w_usdc() {
     let protocol_fee_wallet =
         anchor_spl::associated_token::get_associated_token_address(&initializer.pubkey(), &mint);
     let account = get_token_account(&mut ctx, protocol_fee_wallet).await;
-    assert_eq!(account.amount, 24062 + 7562);
+    assert_eq!(account.amount, 24063 + 7563);
 
     // check owner fee wallet
     let owner_fee_wallet =
         anchor_spl::associated_token::get_associated_token_address(&owner.pubkey(), &mint);
     let account = get_token_account(&mut ctx, owner_fee_wallet).await;
-    assert_eq!(account.amount, 24062 + 7562);
+    assert_eq!(account.amount, 24063 + 7563);
 
     // check total owner's pass supply
     let (passes_supply_pda, _) = get_passes_supply_pda(&owner.pubkey());
@@ -295,6 +297,15 @@ async fn test_buy_passes_w_usdc() {
     let (passes_balance_pda, _) = get_passes_balance_pda(&owner.pubkey(), &buyer.pubkey());
     let passes_balance: PassesBalance = get_account(&mut ctx, passes_balance_pda).await;
     assert_eq!(passes_balance.amount, 11);
+
+    // check buyer balance after purchase and ...
+    let buyer_wallet =
+        anchor_spl::associated_token::get_associated_token_address(&buyer.pubkey(), &mint);
+    let account = get_token_account(&mut ctx, buyer_wallet).await;
+    assert_eq!(
+        account.amount,
+        5_u64 * ONE_USDC - 2406250 - 24063 - 24063 - 756250 - 7563 - 7563
+    );
 }
 
 #[tokio::test]
@@ -305,8 +316,8 @@ async fn test_sell_passes_w_usdc() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_USDC,
-        OWNER_FEE_USDC,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -348,13 +359,15 @@ async fn test_sell_passes_w_usdc() {
     let protocol_fee_wallet =
         anchor_spl::associated_token::get_associated_token_address(&initializer.pubkey(), &mint);
     let account = get_token_account(&mut ctx, protocol_fee_wallet).await;
-    assert_eq!(account.amount, 24062 + 20625);
+    // assert_eq!(account.amount, 24062 + 20625);
+    assert_eq!(account.amount, 24063 + 20625);
 
     // check owner fee wallet
     let owner_fee_wallet =
         anchor_spl::associated_token::get_associated_token_address(&owner.pubkey(), &mint);
     let account = get_token_account(&mut ctx, owner_fee_wallet).await;
-    assert_eq!(account.amount, 24062 + 20625);
+    // assert_eq!(account.amount, 24062 + 20625);
+    assert_eq!(account.amount, 24063 + 20625);
 
     // check buyer balance after purchase and ...
     let buyer_wallet =
@@ -362,7 +375,7 @@ async fn test_sell_passes_w_usdc() {
     let account = get_token_account(&mut ctx, buyer_wallet).await;
     assert_eq!(
         account.amount,
-        5_u64 * ONE_USDC - 2406250 - 24062 - 24062 + 2021250
+        5_u64 * ONE_USDC - 2406250 - 24063 - 24063 + 2062500 - 20625 - 20625
     );
 }
 
@@ -379,8 +392,8 @@ async fn test_buy_passes_w_sol() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_SOL,
-        OWNER_FEE_SOL,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -436,8 +449,8 @@ async fn test_sell_passes_w_sol() {
         &mut ctx,
         &initializer,
         &mint,
-        PROTOCOL_FEE_SOL,
-        OWNER_FEE_SOL,
+        PROTOCOL_FEE_BPS,
+        OWNER_FEE_BPS,
     )
     .await;
 
@@ -595,8 +608,8 @@ mod utils {
         ctx: &mut ProgramTestContext,
         initializer: &Keypair,
         mint: &Pubkey,
-        protocol_fee_pct: u64,
-        owner_fee_pct: u64,
+        protocol_fee_bps: u64,
+        owner_fee_bps: u64,
     ) {
         // get pdas
         let (config, _) = get_config_pda();
@@ -606,8 +619,8 @@ mod utils {
             anchor_spl::associated_token::get_associated_token_address(&initializer.pubkey(), mint);
 
         let args = instruction::Init {
-            protocol_fee_pct,
-            owner_fee_pct,
+            protocol_fee_bps,
+            owner_fee_bps,
         };
         let accounts = accounts::Init {
             admin: initializer.pubkey(),

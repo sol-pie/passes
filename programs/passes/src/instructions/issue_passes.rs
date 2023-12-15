@@ -37,7 +37,7 @@ pub struct IssuePasses<'info> {
 
     #[account(
         seeds = [state::Config::SEED],
-        bump
+        bump = config.bump
     )]
     pub config: Box<Account<'info, state::Config>>,
 
@@ -78,6 +78,9 @@ pub fn issue_passes(ctx: Context<IssuePasses>, amount: u64) -> Result<()> {
         .amount
         .checked_add(amount)
         .ok_or(PassesError::MathOverflow)?;
+
+    passes_balance.bump = ctx.bumps.passes_balance;
+    passes_supply.bump = ctx.bumps.passes_supply;
 
     msg!("Issue passes: owner {}, amount {}", owner, amount);
 

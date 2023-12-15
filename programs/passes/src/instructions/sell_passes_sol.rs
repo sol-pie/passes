@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::{calc_fees, calc_price_sol},
+    common::{calc_fee, calc_price_sol},
     error::PassesError,
-    state, ONE_SOL,
+    state,
 };
 
 // Enables passes holders to sell their passes back to the contract
@@ -18,27 +18,27 @@ pub struct SellPassesSol<'info> {
     #[account{
         mut,
         seeds = [b"supply", passes_owner.key.as_ref(),],
-        bump,
+        bump = passes_supply.bump
     }]
     passes_supply: Box<Account<'info, state::PassesSupply>>,
 
     #[account{
         mut,
         seeds = [b"balance", passes_owner.key.as_ref(), seller.key.as_ref()],
-        bump,
+        bump = passes_balance.bump
     }]
     passes_balance: Box<Account<'info, state::PassesBalance>>,
 
     #[account(
         seeds = [state::Config::SEED],
-        bump
+        bump = config.bump
     )]
     pub config: Box<Account<'info, state::Config>>,
 
     #[account(
         mut,
         seeds = [state::EscrowSOL::SEED],
-        bump
+        bump = escrow_wallet.bump
     )]
     pub escrow_wallet: Box<Account<'info, state::EscrowSOL>>,
 
@@ -73,22 +73,11 @@ pub fn sell_passes_sol(ctx: Context<SellPassesSol>, amount: u64) -> Result<()> {
     require!(balance >= amount, PassesError::InsufficientPasses);
 
     let price = calc_price_sol(supply - amount, amount);
-
-    let (protocol_fees, owner_fees) = calc_fees(
-        price,
-        config.protocol_fee_pct,
-        config.owner_fee_pct,
-        ONE_SOL,
-    )?;
     require!(price > 0, PassesError::ZeroPrice);
 
-    // msg!("config {:#?}", ctx.accounts.config.to_account_info());
-    // msg!("escrow {:#?}", ctx.accounts.escrow_wallet.to_account_info());
-    // msg!("passes_supply {:#?}", passes_supply.to_account_info());
-    // msg!(
-    //     "passes_owner {:#?}",
-    //     ctx.accounts.passes_owner.to_account_info()
-    // );
+    // calc fees
+    let protocol_fees = calc_fee(config.protocol_fee_bps, price)?;
+    let owner_fees = calc_fee(config.owner_fee_bps, price)?;
 
     // send SOL to seller for sold passes
     let sent_amount = price

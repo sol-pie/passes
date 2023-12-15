@@ -15,7 +15,7 @@ pub struct SetProtocolFeeDst<'info> {
     #[account(
         mut,
         seeds = [state::Config::SEED],
-        bump,
+        bump = config.bump,
         // realloc = state::Config::LEN,
         // realloc::payer = admin,
         // realloc::zero = true,

@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 use solana_program::system_instruction;
 
 use crate::{
-    common::{calc_fees, calc_price_sol},
+    common::{calc_fee, calc_price_sol},
     error::PassesError,
-    state, ONE_SOL,
+    state,
 };
 
 // Purchase passes from a specified passes owner by sending a certain amount of token as payment
@@ -19,7 +19,7 @@ pub struct BuyPassesSol<'info> {
     #[account{
         mut,
         seeds = [b"supply", passes_owner.key.as_ref(),],
-        bump,
+        bump = passes_supply.bump,
     }]
     passes_supply: Box<Account<'info, state::PassesSupply>>,
 
@@ -29,20 +29,20 @@ pub struct BuyPassesSol<'info> {
         payer = buyer,
         space = state::PassesBalance::LEN,
         seeds = [b"balance", passes_owner.key.as_ref(), buyer.key.as_ref()],
-        bump,
+        bump
     }]
     passes_balance: Box<Account<'info, state::PassesBalance>>,
 
     #[account(
         seeds = [state::Config::SEED],
-        bump
+        bump = config.bump
     )]
     pub config: Box<Account<'info, state::Config>>,
 
     #[account(
         mut,
         seeds = [state::EscrowSOL::SEED],
-        bump
+        bump = escrow_wallet.bump
     )]
     pub escrow_wallet: Box<Account<'info, state::EscrowSOL>>,
 
@@ -77,12 +77,9 @@ pub fn buy_passes_sol(ctx: Context<BuyPassesSol>, amount: u64) -> Result<()> {
     let price = calc_price_sol(supply, amount);
     require!(price > 0, PassesError::ZeroPrice);
 
-    let (protocol_fees, owner_fees) = calc_fees(
-        price,
-        config.protocol_fee_pct,
-        config.owner_fee_pct,
-        ONE_SOL,
-    )?;
+    // calc fees
+    let protocol_fees = calc_fee(config.protocol_fee_bps, price)?;
+    let owner_fees = calc_fee(config.owner_fee_bps, price)?;
 
     // send buyer's token to escrow wallet
     let from = ctx.accounts.buyer.to_account_info();
@@ -126,6 +123,8 @@ pub fn buy_passes_sol(ctx: Context<BuyPassesSol>, amount: u64) -> Result<()> {
         .amount
         .checked_add(amount)
         .ok_or(PassesError::MathOverflow)?;
+
+    passes_balance.bump = ctx.bumps.passes_balance;
 
     msg!(
         "Buy passes: owner {}, buyer {}, amount {}, price {}, protocol_fees {}, owner_fees {}, balance {}, supply {}",

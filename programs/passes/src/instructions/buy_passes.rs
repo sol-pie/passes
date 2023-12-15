@@ -8,7 +8,7 @@ use anchor_spl::{
 };
 
 use crate::{
-    common::{calc_fees, calc_price, transfer_tokens_from_user},
+    common::{calc_fee, calc_price, transfer_tokens_from_user},
     error::PassesError,
     state, ONE_USDC,
 };
@@ -25,7 +25,7 @@ pub struct BuyPasses<'info> {
     #[account{
         mut,
         seeds = [b"supply", passes_owner.key.as_ref(),],
-        bump,
+        bump = passes_supply.bump
     }]
     passes_supply: Box<Account<'info, state::PassesSupply>>,
 
@@ -41,7 +41,7 @@ pub struct BuyPasses<'info> {
 
     #[account(
         seeds = [state::Config::SEED],
-        bump
+        bump = config.bump
     )]
     pub config: Box<Account<'info, state::Config>>,
 
@@ -102,12 +102,9 @@ pub fn buy_passes(ctx: Context<BuyPasses>, amount: u64) -> Result<()> {
     let price = calc_price(supply, amount);
     require!(price > 0, PassesError::ZeroPrice);
 
-    let (protocol_fees, owner_fees) = calc_fees(
-        price,
-        config.protocol_fee_pct,
-        config.owner_fee_pct,
-        ONE_USDC,
-    )?;
+    // calc fees
+    let protocol_fees = calc_fee(config.protocol_fee_bps, price)?;
+    let owner_fees = calc_fee(config.owner_fee_bps, price)?;
 
     // send buyer's token to escrow wallet
     let from = ctx.accounts.buyer_wallet.to_account_info();
@@ -148,6 +145,8 @@ pub fn buy_passes(ctx: Context<BuyPasses>, amount: u64) -> Result<()> {
         .amount
         .checked_add(amount)
         .ok_or(PassesError::MathOverflow)?;
+
+    passes_balance.bump = ctx.bumps.passes_balance;
 
     msg!(
         "Buy passes: owner {}, buyer {}, amount {}, price {}, protocol_fees {}, owner_fees {}, balance {}, supply {}",

@@ -17,7 +17,7 @@ pub struct SetFeePercent<'info> {
     #[account(
         mut,
         seeds = [state::Config::SEED],
-        bump,
+        bump = config.bump,
         // realloc = state::Config::LEN,
         // realloc::payer = admin,
         // realloc::zero = true,
@@ -29,14 +29,14 @@ pub struct SetFeePercent<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn set_protocol_fee_pct(ctx: Context<SetFeePercent>, fee_pct: u64) -> Result<()> {
-    ctx.accounts.config.protocol_fee_pct = fee_pct;
+pub fn set_protocol_fee_bps(ctx: Context<SetFeePercent>, fee_bps: u64) -> Result<()> {
+    ctx.accounts.config.protocol_fee_bps = fee_bps;
 
     Ok(())
 }
 
-pub fn set_owner_fee_pct(ctx: Context<SetFeePercent>, fee_pct: u64) -> Result<()> {
-    ctx.accounts.config.owner_fee_pct = fee_pct;
+pub fn set_owner_fee_bps(ctx: Context<SetFeePercent>, fee_bps: u64) -> Result<()> {
+    ctx.accounts.config.owner_fee_bps = fee_bps;
 
     Ok(())
 }

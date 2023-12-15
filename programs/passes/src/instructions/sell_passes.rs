@@ -8,7 +8,7 @@ use anchor_spl::{
 };
 
 use crate::{
-    common::{calc_fees, calc_price, transfer_tokens, transfer_tokens_from_user},
+    common::{calc_fee, calc_price, transfer_tokens, transfer_tokens_from_user},
     error::PassesError,
     state, ONE_USDC,
 };
@@ -25,20 +25,20 @@ pub struct SellPasses<'info> {
     #[account{
         mut,
         seeds = [b"supply", passes_owner.key.as_ref()],
-        bump,
+        bump = passes_supply.bump
     }]
     passes_supply: Box<Account<'info, state::PassesSupply>>,
 
     #[account{
         mut,
         seeds = [b"balance", passes_owner.key.as_ref(), seller.key.as_ref()],
-        bump,
+        bump = passes_balance.bump
     }]
     passes_balance: Box<Account<'info, state::PassesBalance>>,
 
     #[account(
         seeds = [state::Config::SEED],
-        bump
+        bump = config.bump
     )]
     pub config: Box<Account<'info, state::Config>>,
 
@@ -104,18 +104,15 @@ pub fn sell_passes(ctx: Context<SellPasses>, amount: u64) -> Result<()> {
     let price = calc_price(supply - amount, amount);
     require!(price > 0, PassesError::ZeroPrice);
 
-    let (protocol_fees, owner_fees) = calc_fees(
-        price,
-        config.protocol_fee_pct,
-        config.owner_fee_pct,
-        ONE_USDC,
-    )?;
+    // calc fees
+    let protocol_fees = calc_fee(config.protocol_fee_bps, price)?;
+    let owner_fees = calc_fee(config.owner_fee_bps, price)?;
 
     // send seller token for sold passes
     let from = ctx.accounts.escrow_wallet.to_account_info();
     let to = ctx.accounts.seller_wallet.to_account_info();
     let authority = ctx.accounts.config.to_account_info();
-    let bump_vector = ctx.bumps.config.to_le_bytes();
+    let bump_vector = ctx.accounts.config.bump.to_le_bytes();
     let authority_seeds: &[&[&[u8]]] = &[&[b"config", bump_vector.as_ref()]];
     let token_program = ctx.accounts.token_program.to_account_info();
     let sent_amount = price
