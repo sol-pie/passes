@@ -18,4 +18,8 @@ pub enum PassesError {
     ZeroAmount,
     #[msg("Price cannot be zero")]
     ZeroPrice,
+    #[msg("Fee must be below or equal 100%")]
+    InvalidFee,
+    #[msg("Price less than 10000")]
+    PriceTooSmall,
 }

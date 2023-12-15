@@ -65,27 +65,29 @@ pub struct Init<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn init(ctx: Context<Init>, protocol_fee_pct: u64, owner_fee_pct: u64) -> Result<()> {
+pub fn init(ctx: Context<Init>, protocol_fee_bps: u64, owner_fee_bps: u64) -> Result<()> {
     let config = &mut ctx.accounts.config;
-
     config.admin = *ctx.accounts.admin.key;
     config.payment_mint = ctx.accounts.payment_mint.key();
     config.escrow_token_wallet = ctx.accounts.escrow_token_wallet.key();
     config.escrow_sol_wallet = ctx.accounts.escrow_sol_wallet.key();
     config.protocol_fee_token_wallet = ctx.accounts.protocol_fee_wallet.key();
-    config.protocol_fee_pct = protocol_fee_pct;
-    config.owner_fee_pct = owner_fee_pct;
+    config.protocol_fee_bps = protocol_fee_bps;
+    config.owner_fee_bps = owner_fee_bps;
+    config.bump = ctx.bumps.config;
+
+    ctx.accounts.escrow_sol_wallet.bump = ctx.bumps.escrow_sol_wallet;
 
     msg!(
-            "Init: program admin {}, config {}, payment mint {}, escrow token wallet {}, escrow sol wallet {}, protocol fee token wallet {}, protocol fee pct {}, owner fee pct{}",
+            "Init: program admin {}, config {}, payment mint {}, escrow token wallet {}, escrow sol wallet {}, protocol fee token wallet {}, protocol fee bps {}, owner fee bps {}",
             config.admin,
             config.key(),
             config.payment_mint,
             config.escrow_token_wallet,
             config.escrow_sol_wallet,
             config.protocol_fee_token_wallet,
-            config.protocol_fee_pct,
-            config.owner_fee_pct
+            config.protocol_fee_bps,
+            config.owner_fee_bps
         );
 
     Ok(())

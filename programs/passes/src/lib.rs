@@ -2,10 +2,12 @@ use anchor_lang::prelude::*;
 
 use instructions::*;
 
-pub mod common;
 pub mod error;
 pub mod instructions;
 pub mod state;
+
+mod common;
+mod math;
 
 #[cfg(test)]
 mod tests;
@@ -27,16 +29,16 @@ declare_id!("8j5vzygvZzkmFAQ186yPbr4vgVGFtSvmFyzE7KVXmB8Q");
 pub mod passes {
     use super::*;
 
-    pub fn init(ctx: Context<Init>, protocol_fee_pct: u64, owner_fee_pct: u64) -> Result<()> {
-        instructions::init(ctx, protocol_fee_pct, owner_fee_pct)
+    pub fn init(ctx: Context<Init>, protocol_fee_bps: u64, owner_fee_bps: u64) -> Result<()> {
+        instructions::init(ctx, protocol_fee_bps, owner_fee_bps)
     }
 
-    pub fn set_protocol_fee_pct(ctx: Context<SetFeePercent>, fee_pct: u64) -> Result<()> {
-        instructions::set_protocol_fee_pct(ctx, fee_pct)
+    pub fn set_protocol_fee_bps(ctx: Context<SetFeePercent>, fee_bps: u64) -> Result<()> {
+        instructions::set_protocol_fee_bps(ctx, fee_bps)
     }
 
-    pub fn set_owner_fee_pct(ctx: Context<SetFeePercent>, fee_pct: u64) -> Result<()> {
-        instructions::set_owner_fee_pct(ctx, fee_pct)
+    pub fn set_owner_fee_bps(ctx: Context<SetFeePercent>, fee_bps: u64) -> Result<()> {
+        instructions::set_owner_fee_bps(ctx, fee_bps)
     }
 
     pub fn set_protocol_fee_dst(ctx: Context<SetProtocolFeeDst>) -> Result<()> {

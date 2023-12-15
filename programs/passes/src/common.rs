@@ -1,9 +1,7 @@
-use std::fmt::Display;
-
 use anchor_lang::prelude::*;
 use anchor_spl::token::Transfer;
 
-use crate::{error::PassesError, ONE_SOL, ONE_USDC};
+use crate::{math, ONE_SOL, ONE_USDC};
 
 pub fn calc_price(supply: u64, amount: u64) -> u64 {
     let sum1 = if supply == 0 {
@@ -79,38 +77,14 @@ pub fn calc_price_sol(supply: u64, amount: u64) -> u64 {
     price
 }
 
-pub fn calc_fees(
-    price: u64,
-    protocol_fee_pct: u64,
-    owner_fee_pct: u64,
-    divider: u64,
-) -> Result<(u64, u64)> {
-    let protocol_fees = price
-        .checked_mul(protocol_fee_pct)
-        .ok_or(PassesError::MathOverflow)?
-        .checked_div(divider)
-        .ok_or(PassesError::MathOverflow)?;
-    let owner_fees = price
-        .checked_mul(owner_fee_pct)
-        .ok_or(PassesError::MathOverflow)?
-        .checked_div(divider)
-        .ok_or(PassesError::MathOverflow)?;
-
-    Ok((protocol_fees, owner_fees))
-}
-
-pub fn scale(amount: u64, decimals: u8) -> u64 {
-    checked_mul(amount, 10u64.pow(decimals as u32)).unwrap()
-}
-
-pub fn checked_mul<T>(arg1: T, arg2: T) -> Result<T>
-where
-    T: num_traits::PrimInt + Display,
-{
-    arg1.checked_mul(&arg2).map(Ok).unwrap_or_else(|| {
-        msg!("Error: Overflow in {} * {}", arg1, arg2);
-        err!(PassesError::MathOverflow)
-    })
+pub fn calc_fee(fee: u64, amount: u64) -> Result<u64> {
+    if fee == 0 || amount == 0 {
+        return Ok(0);
+    }
+    math::checked_as_u64(math::checked_ceil_div(
+        math::checked_mul(amount as u128, fee as u128)?,
+        math::BPS_POWER,
+    )?)
 }
 
 pub fn transfer_tokens<'info>(
@@ -151,3 +125,23 @@ pub fn transfer_tokens_from_user<'info>(
     );
     anchor_spl::token::transfer(ctx, amount)
 }
+
+/* pub fn calc_fees(
+    price: u64,
+    protocol_fee_pct: u64,
+    owner_fee_pct: u64,
+    divider: u64,
+) -> Result<(u64, u64)> {
+    let protocol_fees = price
+        .checked_mul(protocol_fee_pct)
+        .ok_or(PassesError::MathOverflow)?
+        .checked_div(divider)
+        .ok_or(PassesError::MathOverflow)?;
+    let owner_fees = price
+        .checked_mul(owner_fee_pct)
+        .ok_or(PassesError::MathOverflow)?
+        .checked_div(divider)
+        .ok_or(PassesError::MathOverflow)?;
+
+    Ok((protocol_fees, owner_fees))
+} */
