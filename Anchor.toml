@@ -14,7 +14,7 @@ passes = "8j5vzygvZzkmFAQ186yPbr4vgVGFtSvmFyzE7KVXmB8Q"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "../dev3-keypair.json"
 
 [scripts]
